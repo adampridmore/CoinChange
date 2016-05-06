@@ -1,11 +1,11 @@
 package io.github.leedscodedojo;
 
 import java.util.*;
-import java.util.stream.Collector;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import static java.lang.Integer.*;
+import static java.text.MessageFormat.*;
 import static java.util.Collections.singletonList;
 
 public class CoinSet {
@@ -21,33 +21,48 @@ public class CoinSet {
                 .collect(Collectors.toList());
     }
 
-    public List<Integer> coinsForAmount(int amount) {
+    public List<Integer> coinsForAmount(int totalAmount) {
         List<Result> results = new ArrayList<>(singletonList(Result.zero));
 
-        IntStream.rangeClosed(1, amount).boxed()
-                .map(value -> calculateResultForValue(value, results))
+        IntStream.rangeClosed(1, totalAmount).boxed()
+                .map(amount -> calculateResultForAmount(amount, results))
                 .forEach(results::add);
 
         return toCoinResult(results);
     }
 
+    private Result calculateResultForAmount(int targetAmount, List<Result> results) {
+        Optional<Result> bestPreviousResultOpt = coins.stream()
+                .map(coin -> targetAmount - coin)
+                .filter(x -> x >= 0)
+                .map(results::get)
+                .min((o1, o2) -> compare(o1.getNumberOfCoins(), o2.getNumberOfCoins()))
+                ;
+
+        if (!bestPreviousResultOpt.isPresent()) {
+            throw new RuntimeException(format("No best result found for: {0}", Integer.toString(targetAmount)));
+        }
+
+        Result bestPreviousResult = bestPreviousResultOpt.get();
+
+        int lastCoin = targetAmount - bestPreviousResult.getValue();
+        return new Result(targetAmount,
+                bestPreviousResult.getNumberOfCoins() + 1,
+                lastCoin);
+    }
+
     private List<Integer> toCoinResult(List<Result> results) {
-//        String text = results
-//                .stream()
-//                .map(Result::toString)
-//                .collect(Collectors.joining(System.lineSeparator()));
-//
-//        System.out.println(text);
+        //printResults(results);
 
         List<Integer> coinsForSolution = new ArrayList<>();
 
-        Result remainderResult = last(results);
+        Result remainder = last(results);
         while (true) {
-            int lastCoin = remainderResult.getLastCoin();
+            int lastCoin = remainder.getLastCoin();
             coinsForSolution.add(lastCoin);
-            remainderResult = results.get(remainderResult.getValue() - lastCoin);
+            remainder = results.get(remainder.getValue() - lastCoin);
 
-            if (remainderResult == Result.zero) {
+            if (remainder == Result.zero) {
                 return coinsForSolution.stream()
                         .sorted(Comparator.<Integer>reverseOrder())
                         .collect(Collectors.toList());
@@ -55,27 +70,16 @@ public class CoinSet {
         }
     }
 
-    private Result last(List<Result> results) {
-        return results.get(results.size() - 1);
+    private void printResults(List<Result> results) {
+        String text = results
+                .stream()
+                .map(Result::toString)
+                .collect(Collectors.joining(System.lineSeparator()));
+
+        System.out.println(text);
     }
 
-    private Result calculateResultForValue(int value, List<Result> results) {
-        Optional<Result> bestPreviousResultOpt = coins.stream()
-                .map(coin -> value - coin)
-                .filter(v -> v >= 0)
-                .map(v -> results.get(v))
-                .min((o1, o2) -> compare(o1.getNumberOfCoins(), o2.getNumberOfCoins()))
-                ;
-
-        if (!bestPreviousResultOpt.isPresent()) {
-            throw new RuntimeException("Bang");
-        }
-
-        Result bestPreviousResult = bestPreviousResultOpt.get();
-
-        int lastCoin = value - bestPreviousResult.getValue();
-        return new Result(value,
-                bestPreviousResult.getNumberOfCoins() + 1,
-                lastCoin);
+    private Result last(List<Result> results) {
+        return results.get(results.size() - 1);
     }
 }
